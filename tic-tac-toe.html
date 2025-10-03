@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Tic Tac Toe — PvP & PvC</title>
+  <style>
+    :root{
+      --bg:#0f1724;
+      --card:#0b1220;
+      --accent:#06b6d4;
+      --muted:#94a3b8;
+      --win:#16a34a;
+      --lose:#ef4444;
+      --glass: rgba(255,255,255,0.03);
+      --radius:14px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;
+      background: linear-gradient(180deg,#031027 0%, #071933 60%);
+      color:#e6eef6;
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+    }
+
+    .app {
+      width:100%;
+      max-width:920px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius: var(--radius);
+      box-shadow: 0 10px 30px rgba(2,6,23,0.7);
+      padding:18px;
+      display:grid;
+      gap:18px;
+      grid-template-columns: 360px 1fr;
+    }
+
+    /* left: board */
+    .board-card {
+      background:var(--card);
+      border-radius:12px;
+      padding:18px;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:12px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+    }
+
+    .title {
+      font-size:1.2rem;
+      font-weight:600;
+      color:var(--accent);
+    }
+
+    .grid {
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap:10px;
+      width:320px;
+      height:320px;
+      touch-action: manipulation;
+    }
+
+    .cell {
+      background:var(--glass);
+      border-radius:10px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:3.2rem;
+      font-weight:700;
+      color:#e6eef6;
+      user-select:none;
+      cursor:pointer;
+      transition: transform .12s ease, background .12s ease;
+    }
+
+    .cell:hover { transform: translateY(-4px); }
+    .cell.disabled { cursor:default; opacity:0.85; transform:none; }
+    .cell.win { background: linear-gradient(90deg, rgba(22,163,74,0.15), rgba(6,182,212,0.06)); box-shadow: 0 6px 18px rgba(6,182,212,0.06) inset; }
+
+    .controls {
+      display:flex;
+      gap:8px;
+      width:100%;
+      justify-content:center;
+      flex-wrap:wrap;
+    }
+
+    button.btn {
+      padding:8px 12px;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,0.04);
+      background:transparent;
+      color:inherit;
+      cursor:pointer;
+      font-weight:600;
+    }
+    button.btn.primary {
+      background:linear-gradient(90deg,var(--accent), #7dd3fc);
+      color:#001219;
+      border:none;
+    }
+
+    /* right column */
+    .meta {
+      padding:18px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      align-items:stretch;
+    }
+
+    .row {
+      display:flex;
+      gap:12px;
+      align-items:center;
+      justify-content:space-between;
+    }
+
+    .switch {
+      background:var(--glass);
+      padding:10px;
+      border-radius:10px;
+      display:flex;
+      gap:8px;
+      align-items:center;
+    }
+
+    .scoreboard {
+      background:transparent;
+      border-radius:12px;
+      padding:10px;
+      display:flex;
+      gap:8px;
+      align-items:center;
+      justify-content:space-around;
+      border:1px solid rgba(255,255,255,0.03);
+    }
+
+    .score {
+      text-align:center;
+    }
+    .small { font-size:0.85rem; color:var(--muted) }
+    .big { font-size:1.6rem; font-weight:700; }
+
+    .status {
+      text-align:center;
+      padding:12px;
+      border-radius:10px;
+      background: rgba(255,255,255,0.02);
+      border:1px solid rgba(255,255,255,0.03);
+      font-weight:600;
+    }
+
+    .settings {
+      display:flex;
+      gap:8px;
+      align-items:center;
+      justify-content:space-between;
+    }
+
+    select, label {
+      background:transparent;
+      color:inherit;
+    }
+
+    footer.note { font-size:0.85rem; color:var(--muted); text-align:center; margin-top:6px }
+
+    /* responsive */
+    @media (max-width:880px){
+      .app { grid-template-columns: 1fr; padding:12px; }
+      .grid { width:85vw; height:85vw; max-width:400px; max-height:400px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app" role="application" aria-label="Tic tac toe">
+    <div class="board-card" aria-hidden="false">
+      <div class="title">Tic Tac Toe</div>
+
+      <div id="grid" class="grid" role="grid" aria-label="Game board">
+        <!-- cells injected by JS -->
+      </div>
+
+      <div class="controls" role="toolbar" aria-label="controls">
+        <button id="restart" class="btn">Restart</button>
+        <button id="undo" class="btn">Undo</button>
+        <button id="toggleMode" class="btn">Switch: Player vs Computer</button>
+        <button id="swapFirst" class="btn">Swap First (X)</button>
+      </div>
+
+      <div class="note small footer note">Click a cell to play. Computer uses optimal strategy when enabled.</div>
+    </div>
+
+    <div class="meta">
+      <div class="row">
+        <div>
+          <div class="small">Game Mode</div>
+          <div class="switch small" id="modeLabel">Player vs Computer</div>
+        </div>
+
+        <div>
+          <div class="small">Current Turn</div>
+          <div class="status" id="status">—</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="small">Scoreboard</div>
+        <div class="scoreboard" role="status" aria-live="polite">
+          <div class="score">
+            <div class="small">X</div>
+            <div class="big" id="scoreX">0</div>
+          </div>
+          <div class="score">
+            <div class="small">Ties</div>
+            <div class="big" id="scoreT">0</div>
+          </div>
+          <div class="score">
+            <div class="small">O</div>
+            <div class="big" id="scoreO">0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings">
+        <div>
+          <div class="small">Difficulty (Computer)</div>
+          <select id="difficulty" aria-label="Difficulty">
+            <option value="hard">Hard (Unbeatable)</option>
+            <option value="easy">Easy</option>
+          </select>
+        </div>
+        <div>
+          <div class="small">Who goes first</div>
+          <select id="first" aria-label="First player">
+            <option value="X">X</option>
+            <option value="O">O</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <div class="small">Controls</div>
+        <div class="small">• Restart resets current board • Undo reverts last move (PvP only) • Swap First toggles starting player</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ---------- Game state ---------- */
+    const gridEl = document.getElementById('grid');
+    const statusEl = document.getElementById('status');
+    const modeLabel = document.getElementById('modeLabel');
+    const toggleModeBtn = document.getElementById('toggleMode');
+    const restartBtn = document.getElementById('restart');
+    const swapFirstBtn = document.getElementById('swapFirst');
+    const undoBtn = document.getElementById('undo');
+    const difficultySelect = document.getElementById('difficulty');
+    const firstSelect = document.getElementById('first');
+
+    const scoreXEl = document.getElementById('scoreX');
+    const scoreOEl = document.getElementById('scoreO');
+    const scoreTEl = document.getElementById('scoreT');
+
+    let board = Array(9).fill(null);        // null | 'X' | 'O'
+    let currentPlayer = 'X';
+    let gameOver = false;
+    let vsComputer = true;
+    let compMark = 'O';
+    let humanMark = 'X';
+    let scores = { X:0, O:0, T:0 };
+    let history = []; // for undo: history of {board, currentPlayer}
+    let firstPlayer = 'X';
+
+    const winningLines = [
+      [0,1,2],[3,4,5],[6,7,8],
+      [0,3,6],[1,4,7],[2,5,8],
+      [0,4,8],[2,4,6]
+    ];
+
+    /* ---------- UI helpers ---------- */
+    function renderBoard(){
+      gridEl.innerHTML = '';
+      board.forEach((cell, idx) => {
+        const cellEl = document.createElement('button');
+        cellEl.className = 'cell';
+        cellEl.setAttribute('role','gridcell');
+        cellEl.setAttribute('aria-label', `Cell ${idx+1}`);
+        cellEl.dataset.index = idx;
+        cellEl.disabled = gameOver || !!cell;
+        if(cell) cellEl.textContent = cell;
+        if(cellEl.disabled) cellEl.classList.add('disabled');
+        cellEl.addEventListener('click', onCellClick);
+        gridEl.appendChild(cellEl);
+      });
+    }
+
+    function updateStatus(text){
+      statusEl.textContent = text;
+    }
+
+    function setModeLabel(){
+      modeLabel.textContent = vsComputer ? 'Player vs Computer' : 'Player vs Player';
+      toggleModeBtn.textContent = vsComputer ? 'Switch: Player vs Player' : 'Switch: Player vs Computer';
+    }
+
+    function updateScores(){
+      scoreXEl.textContent = scores.X;
+      scoreOEl.textContent = scores.O;
+      scoreTEl.textContent = scores.T;
+    }
+
+    /* ---------- Game logic ---------- */
+    function checkWinner(b){
+      for(const line of winningLines){
+        const [a,b1,c] = line;
+        if(b[a] && b[a] === b[b1] && b[a] === b[c]){
+          return {winner: b[a], line};
+        }
+      }
+      return null;
+    }
+
+    function isTie(b){
+      return b.every(cell => cell !== null) && !checkWinner(b);
+    }
+
+    function endGame(result){
+      gameOver = true;
+      // highlight winning line if any
+      if(result && result.winner){
+        highlightWinningLine(result.line);
+        scores[result.winner]++;
+        updateScores();
+        updateStatus(`${result.winner} wins!`);
+      } else {
+        scores.T++;
+        updateScores();
+        updateStatus(`It's a tie!`);
+      }
+    }
+
+    function highlightWinningLine(line){
+      if(!line) return;
+      line.forEach(i => {
+        const cell = gridEl.querySelector(`[data-index="${i}"]`);
+        if(cell) cell.classList.add('win');
+      });
+    }
+
+    /* ---------- Moves ---------- */
+    function onCellClick(e){
+      const idx = Number(e.currentTarget.dataset.index);
+      if(gameOver || board[idx]) return; // safety
+      saveHistory();
+      makeMove(idx, currentPlayer);
+      afterMove();
+    }
+
+    function makeMove(idx, mark){
+      board[idx] = mark;
+      renderBoard();
+    }
+
+    function afterMove(){
+      const res = checkWinner(board);
+      if(res){
+        endGame(res);
+        return;
+      }
+      if(isTie(board)){
+        endGame(null);
+        return;
+      }
+      // swap player
+      currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+      updateStatus(`${currentPlayer}'s turn`);
+      // if vsComputer and it's computer's turn -> compute
+      if(vsComputer && currentPlayer === compMark && !gameOver){
+        // small delay for UX
+        setTimeout(() => {
+          if(difficultySelect.value === 'easy'){
+            easyComputerMove();
+          } else {
+            const idx = bestMove(board, compMark);
+            saveHistory();
+            makeMove(idx, compMark);
+            afterMove();
+          }
+        }, 220);
+      }
+    }
+
+    /* ---------- Undo (only PvP sensible) ---------- */
+    function saveHistory(){
+      history.push({ board: [...board], currentPlayer });
+      if(history.length > 20) history.shift();
+    }
+
+    function undo(){
+      if(vsComputer) return; // disable undo vs computer: ambiguous
+      if(history.length === 0) return;
+      const state = history.pop();
+      board = state.board;
+      currentPlayer = state.currentPlayer;
+      gameOver = false;
+      // clear win highlight
+      Array.from(gridEl.children).forEach(c => c.classList.remove('win'));
+      renderBoard();
+      updateStatus(`${currentPlayer}'s turn`);
+    }
+
+    /* ---------- Computer players ---------- */
+    function easyComputerMove(){
+      // pick random empty cell
+      const empties = board.map((v,i)=> v===null ? i : null).filter(v=>v!==null);
+      const pick = empties[Math.floor(Math.random()*empties.length)];
+      makeMove(pick, compMark);
+      afterMove();
+    }
+
+    // Minimax for unbeatable AI
+    function bestMove(b, player){
+      // returns index
+      const avail = b.map((v,i)=> v===null ? i : null).filter(x=>x!==null);
+      // if only one empty, return it
+      if(avail.length === 1) return avail[0];
+
+      let bestScore = -Infinity;
+      let move = null;
+      for(const idx of avail){
+        const newBoard = [...b];
+        newBoard[idx] = player;
+        const score = minimax(newBoard, false, player, player);
+        if(score > bestScore){
+          bestScore = score;
+          move = idx;
+        }
+      }
+      return move;
+    }
+
+    function minimax(b, isMaximizing, aiPlayer, originalAI){
+      const winner = checkWinner(b);
+      if(winner){
+        if(winner.winner === aiPlayer) return 10;
+        return -10;
+      }
+      if(isTie(b)) return 0;
+
+      const human = aiPlayer === 'X' ? 'O' : 'X';
+      const avail = b.map((v,i)=> v===null ? i : null).filter(x=>x!==null);
+      if(isMaximizing){
+        let best = -Infinity;
+        for(const idx of avail){
+          b[idx] = aiPlayer;
+          const score = minimax(b, false, aiPlayer, originalAI);
+          b[idx] = null;
+          best = Math.max(best, score);
+        }
+        return best;
+      } else {
+        let best = Infinity;
+        for(const idx of avail){
+          b[idx] = human;
+          const score = minimax(b, true, aiPlayer, originalAI);
+          b[idx] = null;
+          best = Math.min(best, score);
+        }
+        return best;
+      }
+    }
+
+    /* ---------- Controls ---------- */
+    function restart(newBoardOnly = true){
+      board = Array(9).fill(null);
+      gameOver = false;
+      history = [];
+      // remove highlights
+      setTimeout(()=> {
+        Array.from(gridEl.children).forEach(c => c.classList.remove('win'));
+      }, 0);
+      // set current player to firstPlayer
+      currentPlayer = firstPlayer;
+      updateStatus(`${currentPlayer}'s turn`);
+      renderBoard();
+      // if vsComputer and computer is first -> let it move
+      if(vsComputer && currentPlayer === compMark){
+        setTimeout(()=> {
+          if(difficultySelect.value === 'easy') easyComputerMove();
+          else {
+            saveHistory();
+            const idx = bestMove(board, compMark);
+            makeMove(idx, compMark);
+            afterMove();
+          }
+        }, 300);
+      }
+    }
+
+    function toggleMode(){
+      vsComputer = !vsComputer;
+      // set computer/human mark depending on humanMark variable
+      compMark = vsComputer ? (humanMark === 'X' ? 'O' : 'X') : null;
+      setModeLabel();
+      restart();
+    }
+
+    function swapFirst(){
+      firstPlayer = firstPlayer === 'X' ? 'O' : 'X';
+      firstSelect.value = firstPlayer;
+      swapFirstBtn.textContent = `Swap First (${firstPlayer})`;
+      restart();
+    }
+
+    /* ---------- init ---------- */
+    function init(){
+      // create cells
+      renderBoard();
+      setModeLabel();
+      updateScores();
+      currentPlayer = firstPlayer;
+      updateStatus(`${currentPlayer}'s turn`);
+      // wire up controls
+      restartBtn.addEventListener('click', ()=> restart());
+      toggleModeBtn.addEventListener('click', ()=> toggleMode());
+      swapFirstBtn.addEventListener('click', ()=> swapFirst());
+      undoBtn.addEventListener('click', ()=> undo());
+      difficultySelect.addEventListener('change', ()=> {});
+      firstSelect.addEventListener('change', (e)=> {
+        firstPlayer = e.target.value;
+        restart();
+      });
+
+      // handle who plays X/O
+      // human starts as X by default; if user selects first = O, swap human/computer marks when vsComputer
+      firstSelect.value = firstPlayer;
+
+      // keyboard controls for accessibility
+      document.addEventListener('keydown', (e) => {
+        if(e.key === 'r' || e.key === 'R') restart();
+        if(e.key === 'u' || e.key === 'U') undo();
+        if(e.key === 'm' || e.key === 'M') toggleMode();
+      });
+
+      // if vsComputer and computer starts, do initial move
+      if(vsComputer && currentPlayer === compMark){
+        setTimeout(()=> {
+          if(difficultySelect.value === 'easy') easyComputerMove();
+          else {
+            const idx = bestMove(board, compMark);
+            saveHistory();
+            makeMove(idx, compMark);
+            afterMove();
+          }
+        }, 300);
+      }
+    }
+
+    // expose some for debug (optional)
+    window._ttt = { restart, toggleMode, bestMove };
+
+    init();
+  </script>
+</body>
+</html>
